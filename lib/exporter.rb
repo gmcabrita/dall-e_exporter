@@ -50,19 +50,20 @@ class Exporter
       return
     end
 
-    down = Down::Http.new { |client| client.auth("Bearer #{ENV["API_KEY"]}") }
-
     Parallel.each(
       generation_ids_to_download,
       in_threads: 10,
       progress: "Downloading generations..."
     ) do |generation_id|
       retry_count = 0
+      file_name = File.join(ENV["FOLDER"], "#{generation_id}.png")
       begin
-        down.download(
-          "https://labs.openai.com/api/labs/generations/#{generation_id}/download",
-          destination: File.join(ENV["FOLDER"], "#{generation_id}.png")
-        )
+        Down::Http
+          .new { |client| client.auth("Bearer #{ENV["API_KEY"]}") }
+          .download(
+            "https://labs.openai.com/api/labs/generations/#{generation_id}/download",
+            destination: file_name
+          )
       rescue => e
         if retry_count == 10
           raise "ERROR: Failed to download generation over #{retry_count} times, aborting."
@@ -71,7 +72,7 @@ class Exporter
         sleep 3**retry_count
         retry_count += 1
 
-        puts "WARN: #{e.message}"
+        puts "WARN: #{e.class}: #{e.message}"
 
         retry
       end
